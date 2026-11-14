@@ -26,7 +26,7 @@ index dd13490..9c632a6 100644
                  <p class="muted">Everything happens locally. Your save files stay in your browser. Export downloads a ZIP; your original files are never overwritten but keep backups!</p>
              </div>
 diff --git a/PokoHex.Web/Main.razor.cs b/PokoHex.Web/Main.razor.cs
-index 34161ee..e052ccb 100644
+index 34161ee..2509204 100644
 --- a/PokoHex.Web/Main.razor.cs
 +++ b/PokoHex.Web/Main.razor.cs
 @@ -36,15 +36,18 @@ public partial class Main : IAsyncDisposable
@@ -64,7 +64,7 @@ index 34161ee..e052ccb 100644
          }
          var state = GetRenderState();
          LastRender = state;
-@@ -138,36 +148,74 @@ public partial class Main : IAsyncDisposable
+@@ -138,36 +148,75 @@ public partial class Main : IAsyncDisposable
              return;
          await RunBusy("Verifying and exporting save…", async () =>
          {
@@ -118,8 +118,9 @@ index 34161ee..e052ccb 100644
 +        await RunBusy($"Verifying and writing to {HostName}…", async () =>
 +        {
 +            var files = ApplyChanges();
-+            var message = await JS.InvokeAsync<string>("pokohex.host.write",
-+                files.Select(z => new HostFile(z.Key.Replace('\\', '/'), Convert.ToBase64String(z.Value))).ToArray());
++            var hostFiles = files.Select(z => new HostFile(z.Key.Replace('\\', '/'), Convert.ToBase64String(z.Value))).ToArray();
++            // One argument: an array passed alone would be taken as the params argument list.
++            var message = await JS.InvokeAsync<string>("pokohex.host.write", new object[] { hostFiles });
 +            ReloadKeepingView(files);
 +            Status = message.Length != 0 ? message : $"Written to {HostName}.";
 +        });
