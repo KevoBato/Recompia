@@ -1,0 +1,60 @@
+# Fork only, never for the upstream pull request: a Windows test build of the launcher with the Save Editor and its data tool.
+# Runs on a push to save-editor-windows. Same launcher build as release.yml's windows-launcher job, plus
+# launcher/scripts/build-pokohex.sh (the editor, and pokohex-extract for tools/pokohex).
+name: Save editor Windows
+
+on:
+  push:
+    branches: [save-editor-windows]
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    env:
+      VERSION: 0.12.0   # the installed release this build is tested in, so it does not offer that release as an update
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: launcher/package-lock.json
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: launcher/src-tauri
+
+      - name: Save editor (PokoHex) and its data tool
+        shell: bash
+        run: sh launcher/scripts/build-pokohex.sh --extractor win-x64 out/tools/pokohex
+
+      - name: Launcher
+        working-directory: launcher
+        shell: pwsh
+        run: |
+          $c = 'src-tauri/tauri.conf.json'; (Get-Content -Raw $c) -replace '"version": "[^"]*"', "`"version`": `"$env:VERSION`"" | Set-Content -NoNewline $c
+          $t = 'src-tauri/Cargo.toml'; (Get-Content -Raw $t) -replace '(?m)^version = "[^"]*"', "version = `"$env:VERSION`"" | Set-Content -NoNewline $t
+          npm ci
+          if ($LASTEXITCODE) { exit 1 }
+          npm run tauri build
+          if ($LASTEXITCODE) { exit 1 }
+          Copy-Item src-tauri/target/release/pokopia-launcher.exe ../out/PokopiaLauncher.exe
+
+      - name: Data tool works
+        shell: pwsh
+        run: |
+          & out/tools/pokohex/pokohex-extract.exe --check nowhere
+          if ($LASTEXITCODE -ne 1) { exit 1 }
+          exit 0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PokopiaLauncher-save-editor-windows-0.12.0
+          path: out/
